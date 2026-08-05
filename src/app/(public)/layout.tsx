@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/browserClient";
+import { signOut } from "@/lib/actions/auth";
 
 export default function PublicLayout({
   children,
@@ -12,6 +14,24 @@ export default function PublicLayout({
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setIsLoggedIn(true);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-gray">
@@ -86,22 +106,50 @@ export default function PublicLayout({
               </div>
             )}
 
-            <Link
-              href="/signup"
-              className={`font-sm text-sm font-semibold px-md py-sm rounded transition-colors ${
-                isHome
-                  ? "text-on-primary-container hover:bg-on-primary-container/10"
-                  : "text-primary-navy hover:bg-surface-gray"
-              }`}
-            >
-              Login
-            </Link>
-            <Link
-              href="/signup"
-              className="font-sm text-sm font-bold bg-[#EA580C] text-white px-md py-sm rounded-lg hover:bg-[#C2410C] transition-colors shadow-sm"
-            >
-              Get Started
-            </Link>
+            {isLoggedIn ? (
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Link
+                  href="/dashboard/properties"
+                  className="font-sm text-sm font-bold bg-[#EA580C] text-white px-md py-sm rounded-lg hover:bg-[#C2410C] transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <span>Go to Dashboard</span>
+                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </Link>
+                <form action={signOut} className="inline">
+                  <button
+                    type="submit"
+                    className={`font-sm text-sm font-semibold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 border cursor-pointer ${
+                      isHome
+                        ? "text-on-primary-container border-on-primary-container/20 hover:bg-on-primary-container/10 hover:border-red-400 hover:text-red-400"
+                        : "text-text-secondary border-border-gray hover:bg-surface-gray hover:text-red-600 hover:border-red-300"
+                    }`}
+                    title="Sign Out"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    <span className="hidden md:inline">Sign Out</span>
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className={`font-sm text-sm font-semibold px-md py-sm rounded transition-colors ${
+                    isHome
+                      ? "text-on-primary-container hover:bg-on-primary-container/10"
+                      : "text-primary-navy hover:bg-surface-gray"
+                  }`}
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="font-sm text-sm font-bold bg-[#EA580C] text-white px-md py-sm rounded-lg hover:bg-[#C2410C] transition-colors shadow-sm"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
 
             {/* Mobile Menu Button */}
             <button
@@ -141,6 +189,17 @@ export default function PublicLayout({
             <a href="#" className="block font-body text-body">
               Resources
             </a>
+            {isLoggedIn && (
+              <form action={signOut} className="pt-2 border-t border-slate-400/20">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 font-body text-body text-red-500 hover:text-red-600 transition-colors w-full text-left font-semibold cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">logout</span>
+                  <span>Sign Out</span>
+                </button>
+              </form>
+            )}
           </div>
         )}
       </header>

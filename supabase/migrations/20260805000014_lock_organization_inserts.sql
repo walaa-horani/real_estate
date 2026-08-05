@@ -1,0 +1,28 @@
+-- ---------------------------------------------------------------------------
+-- Remove the last path by which a signed-in user can put a row into
+-- public.organizations themselves.
+--
+-- "organizations_authenticated_insert" was written with check (true) back when
+-- org creation was expected to run as the calling user through
+-- create_organization_with_admin(). That RPC's grant to `authenticated` was
+-- revoked in 20260805000011_payments.sql — organizations are now created only
+-- by apply_paid_transaction(), which is service_role only and bypasses RLS
+-- entirely. The policy outlived its purpose and is left as a hole:
+--
+--   * organizations.is_public is settable on insert, and
+--     "organizations_public_select" exposes every is_public row to anon, so any
+--     account could publish arbitrary agency listings into the public
+--     /agencies directory — attacker-controlled text and links on our domain.
+--   * nothing bounds how many rows one account can insert.
+--
+-- It is not a route to a free subscription: org_members_insert requires
+-- is_org_admin(), so a self-made org can never gain a member, and every
+-- properties/leads policy keys off membership. The exposure is public content
+-- injection and table spam, which is enough.
+--
+-- Dropping the policy leaves organizations with no INSERT policy at all. Under
+-- RLS that means no insert by anon or authenticated, ever. service_role is
+-- unaffected, so the paid signup path keeps working unchanged.
+-- ---------------------------------------------------------------------------
+
+drop policy if exists "organizations_authenticated_insert" on public.organizations;

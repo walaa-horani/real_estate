@@ -160,7 +160,7 @@ export default function PropertyDetailPage() {
               windows that flood the space with natural light.
             </p>
             <p>
-              The chef's kitchen is equipped with top-of-the-line appliances,
+              The chef&apos;s kitchen is equipped with top-of-the-line appliances,
               custom cabinetry, and a massive island perfect for entertaining.
               The primary suite is a true sanctuary, complete with a spa-like
               en-suite bathroom and a generous walk-in closet.

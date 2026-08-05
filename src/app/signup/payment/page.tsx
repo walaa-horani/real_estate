@@ -1,145 +1,117 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { startCheckout } from "@/lib/actions/checkout";
 
+// Step 3 of signup: hand the buyer off to PayTabs' hosted payment page.
+//
+// This page creates nothing. It asks the server to open a PayTabs session and
+// then leaves. The organization and its plan only come into existence after
+// PayTabs confirms the payment to our callback endpoint, server to server.
 function PaymentContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const plan = searchParams.get("plan") || "Enterprise";
+  const planSlug = (searchParams.get("plan") ?? "").toLowerCase();
+  const agency = searchParams.get("agency") ?? "";
 
-  const [counter, setCounter] = useState(3);
+  // Derived, not stored: whether the URL carries what checkout needs is a fact
+  // about this render, so it must not go through an effect.
+  const missingInput = !planSlug || !agency;
 
-  // Mapped details
-  const planPriceMap: Record<string, string> = {
-    Basic: "$49.00",
-    Pro: "$99.00",
-    Enterprise: "$199.00",
-  };
-  const price = planPriceMap[plan] || "$199.00";
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const started = useRef(false);
 
+  const error = missingInput
+    ? "Missing plan or agency name. Please pick a plan again."
+    : checkoutError;
+
+  // The `started` ref is the only guard here, deliberately. It has to be a ref
+  // rather than a cleanup flag because it must survive React's development
+  // double-mount: a second checkout session would leave an orphan pending row
+  // and a second PayTabs transaction.
+  //
+  // There is no cleanup, and that is the point. An earlier version cancelled on
+  // unmount, which meant the double-mount cancelled the very call the ref guard
+  // then refused to retry — the request reached PayTabs, came back with a
+  // redirect URL, and got dropped on the floor while the spinner ran forever.
+  // The outcome of this effect is a full-page navigation away, so there is
+  // nothing left to clean up.
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCounter((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Redirect to properties dashboard
-          router.push("/dashboard/properties");
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (missingInput || started.current) return;
+    started.current = true;
 
-    return () => clearInterval(timer);
-  }, [router]);
+    startCheckout(planSlug, agency).then(
+      (result) => {
+        if ("error" in result) {
+          setCheckoutError(result.error);
+          return;
+        }
+
+        // Full navigation — PayTabs' page is on their domain.
+        window.location.href = result.redirectUrl;
+      },
+      (cause) => {
+        // A thrown server action used to surface as the same infinite spinner.
+        console.error("[checkout] startCheckout threw", cause);
+        setCheckoutError("Something went wrong starting checkout. Please try again.");
+      }
+    );
+  }, [planSlug, agency, missingInput]);
 
   return (
-    <main className="flex-grow flex items-center justify-center p-md">
-      <div className="max-w-[448px] w-full bg-surface-container-lowest rounded-lg border border-border-gray shadow-sm p-lg flex flex-col items-center text-center space-y-lg">
-        {/* Progress Indicator */}
-        <div className="w-full flex flex-col items-center space-y-sm mb-md">
-          <div className="flex justify-between w-full max-w-[200px] items-center">
-            <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-sm text-sm">
-              <span
-                className="material-symbols-outlined text-secondary"
-                style={{ fontVariationSettings: "'FILL' 1", fontSize: "16px" }}
-              >
-                check
+    <main className="min-h-screen w-full flex items-center justify-center bg-slate-50/50 py-14 px-4">
+      <div className="max-w-[448px] w-full mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-8 sm:p-10 space-y-6 text-center">
+        <div
+          className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm ring-8 ring-slate-50 ${
+            error ? "bg-red-600" : "bg-[#0F172A]"
+          }`}
+        >
+          {error ? (
+            <span className="material-symbols-outlined text-[28px]">error_outline</span>
+          ) : (
+            <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+          )}
+        </div>
+
+        {error ? (
+          <>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">
+                Couldn&apos;t start checkout
+              </h1>
+              <p className="text-sm text-slate-500">{error}</p>
+            </div>
+            <Link
+              href="/signup/plan"
+              className="inline-block w-full rounded-lg bg-[#0F172A] py-3 px-4 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:bg-[#1e293b]"
+            >
+              Back to plans
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold tracking-tight text-[#0F172A]">
+                Redirecting to secure payment
+              </h1>
+              <p className="text-sm text-slate-500">
+                Connecting you to PayTabs to complete your subscription. Please
+                don&apos;t close this window.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 border-t border-slate-100 pt-5 text-slate-500">
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">
+                verified_user
+              </span>
+              <span className="text-xs">
+                Card details are entered on <strong>PayTabs</strong> and never touch
+                our servers.
               </span>
             </div>
-            <div className="h-[2px] flex-grow bg-secondary mx-2"></div>
-            <div className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-sm text-sm">
-              <span
-                className="material-symbols-outlined text-secondary"
-                style={{ fontVariationSettings: "'FILL' 1", fontSize: "16px" }}
-              >
-                check
-              </span>
-            </div>
-            <div className="h-[2px] flex-grow bg-primary-navy mx-2"></div>
-            <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-sm text-sm border-2 border-primary-navy font-bold">
-              3
-            </div>
-          </div>
-          <span className="font-xs text-xs text-text-secondary uppercase tracking-wider font-bold">
-            Step 3 of 3
-          </span>
-        </div>
-
-        {/* Loading Spinner */}
-        <div className="relative flex justify-center items-center w-24 h-24">
-          <svg
-            className="animate-spin w-16 h-16 text-primary-navy"
-            fill="none"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              fill="currentColor"
-            ></path>
-          </svg>
-          <span
-            className="material-symbols-outlined absolute text-primary-navy"
-            style={{ fontSize: "24px", fontVariationSettings: "'FILL' 1" }}
-          >
-            lock
-          </span>
-        </div>
-
-        {/* Titles */}
-        <div className="space-y-sm">
-          <h1 className="font-h2 text-h2 text-primary-navy font-bold">
-            Redirecting to Secure Payment
-          </h1>
-          <p className="font-body text-body text-text-secondary">
-            Please wait while we connect you to PayTabs to complete your subscription securely.
-          </p>
-          <p className="text-xs text-[#EA580C] font-semibold">
-            Redirecting in {counter}s...
-          </p>
-        </div>
-
-        {/* Order Summary */}
-        <div className="w-full bg-surface-gray rounded border border-border-gray p-md text-left mt-md">
-          <h3 className="font-sm text-sm font-bold text-text-secondary mb-sm uppercase tracking-wide">
-            Order Summary
-          </h3>
-          <div className="flex justify-between items-center border-b border-border-gray pb-sm mb-sm">
-            <span className="font-body text-body font-semibold text-primary-navy">
-              {plan} Plan
-            </span>
-            <span className="font-body text-body font-bold text-primary-navy">
-              {price}
-            </span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="font-sm text-sm text-text-secondary">
-              Billed Annually
-            </span>
-            <span className="font-sm text-sm text-text-secondary">USD</span>
-          </div>
-        </div>
-
-        {/* Security Info */}
-        <div className="flex items-center space-x-sm text-text-secondary pt-md border-t border-border-gray w-full justify-center">
-          <span className="material-symbols-outlined text-[16px] text-secondary">
-            verified_user
-          </span>
-          <span className="font-xs text-xs">
-            Payments processed securely by <strong>PayTabs</strong>
-          </span>
-        </div>
+          </>
+        )}
       </div>
     </main>
   );
@@ -147,11 +119,13 @@ function PaymentContent() {
 
 export default function SignupPaymentPage() {
   return (
-    <Suspense fallback={
-      <div className="flex-grow flex items-center justify-center p-md">
-        <p className="text-text-secondary">Loading payment details...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen w-full flex items-center justify-center bg-slate-50/50">
+          <p className="text-sm font-medium text-slate-500">Preparing checkout…</p>
+        </div>
+      }
+    >
       <PaymentContent />
     </Suspense>
   );

@@ -1,19 +1,27 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function SignupPlanPage() {
+function SignupPlanContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [agency, setAgency] = useState(searchParams.get("agency") ?? "");
+  const [agencyError, setAgencyError] = useState<string | null>(null);
 
   const handleSelectPlan = (planName: string) => {
-    router.push(`/signup/payment?plan=${planName}`);
+    if (!agency.trim()) {
+      setAgencyError("Enter your agency name first.");
+      return;
+    }
+    router.push(`/signup/payment?plan=${planName}&agency=${encodeURIComponent(agency.trim())}`);
   };
 
   const plans = [
     {
       name: "Basic",
-      price: "$49",
+      price: "₺49",
       desc: "Perfect for small teams getting started.",
       features: [
         "Up to 50 active listings",
@@ -25,7 +33,7 @@ export default function SignupPlanPage() {
     },
     {
       name: "Pro",
-      price: "$99",
+      price: "₺99",
       desc: "Everything you need to grow your agency.",
       features: [
         "Up to 250 active listings",
@@ -38,7 +46,7 @@ export default function SignupPlanPage() {
     },
     {
       name: "Enterprise",
-      price: "$199",
+      price: "₺199",
       desc: "Custom solutions for large brokerages.",
       features: [
         "Unlimited active listings",
@@ -104,6 +112,56 @@ export default function SignupPlanPage() {
           Scale your operations with plans designed for teams of all sizes.
           Upgrade or downgrade at any time.
         </p>
+      </div>
+
+      {/* Agency name (prefilled from step 1; editable fallback if resuming
+          a session that never finished creating an org) */}
+      <div className="max-w-[500px] mx-auto mb-12 bg-white rounded-xl border border-slate-200/90 p-6 shadow-sm">
+        <div className="flex items-center gap-3.5 mb-5 border-b border-slate-100 pb-4">
+          <div className="w-10 h-10 rounded-lg bg-[#0F172A] flex items-center justify-center text-white shrink-0 shadow-sm">
+            <span className="material-symbols-outlined text-[20px]">business</span>
+          </div>
+          <div className="text-left">
+            <h2 className="text-sm font-bold text-[#0F172A] leading-snug">
+              Agency Identity & Workspace
+            </h2>
+            <p className="text-xs text-slate-500">
+              Confirm your brokerage name before choosing a plan
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-left">
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#0F172A]" htmlFor="agency-name-input">
+            Agency Name <span className="text-emerald-600">*</span>
+          </label>
+          <div className="relative rounded-lg">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+              <span className="material-symbols-outlined text-[20px]">storefront</span>
+            </div>
+            <input
+              id="agency-name-input"
+              type="text"
+              value={agency}
+              onChange={(e) => {
+                setAgency(e.target.value);
+                setAgencyError(null);
+              }}
+              placeholder="e.g. Skyline Properties & Real Estate"
+              className={`w-full rounded-lg border pl-11 pr-4 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 placeholder:font-normal bg-white transition duration-150 ease-in-out hover:bg-slate-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-offset-0 ${
+                agencyError
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                  : "border-slate-300 focus:border-[#10B981] focus:ring-[#10B981]/20 hover:border-slate-400"
+              }`}
+            />
+          </div>
+          {agencyError && (
+            <div className="flex items-center gap-1.5 mt-2 text-red-600 text-xs font-medium" role="alert">
+              <span className="material-symbols-outlined text-[16px] shrink-0">error_outline</span>
+              <span>{agencyError}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Pricing Cards */}
@@ -173,5 +231,13 @@ export default function SignupPlanPage() {
         ))}
       </div>
     </main>
+  );
+}
+
+export default function SignupPlanPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupPlanContent />
+    </Suspense>
   );
 }

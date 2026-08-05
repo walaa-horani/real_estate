@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useActionState } from "react";
+import { signUpAgency, type SignupActionState } from "@/lib/actions/signup";
 
 export default function SignupDetailsPage() {
   const router = useRouter();
@@ -13,15 +14,41 @@ export default function SignupDetailsPage() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleContinue = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!agencyName || !contactName || !email) {
-      alert("Please fill in all required fields (Agency Name, Full Name, Work Email).");
-      return;
+  const [actionState, formAction, pending] = useActionState<SignupActionState, FormData>(
+    signUpAgency,
+    null
+  );
+
+  useEffect(() => {
+    if (actionState && "success" in actionState && !actionState.needsConfirmation) {
+      router.push(`/signup/plan?agency=${encodeURIComponent(agencyName)}`);
     }
-    router.push("/signup/plan");
-  };
+  }, [actionState, agencyName, router]);
+
+  if (actionState && "success" in actionState && actionState.needsConfirmation) {
+    return (
+      <main className="w-full flex-grow flex items-center justify-center py-12 px-4">
+        <div className="w-full max-w-[448px] mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0F172A] text-white shadow-sm ring-8 ring-slate-50">
+            <span className="material-symbols-outlined text-[28px]">
+              mail
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            Check your email
+          </h1>
+          <p className="text-sm leading-relaxed text-slate-500">
+            We sent a confirmation link to{" "}
+            <strong className="text-slate-700">{email}</strong>. Click it to
+            verify your account and continue setting up{" "}
+            {agencyName || "your agency"}.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-grow flex items-center justify-center py-xl px-4 sm:px-6 lg:px-8">
@@ -46,7 +73,7 @@ export default function SignupDetailsPage() {
           <p className="font-sm text-sm text-text-secondary">
             Please provide your primary agency information to set up your enterprise account.
           </p>
-          <form onSubmit={handleContinue} className="space-y-lg">
+          <form action={formAction} className="space-y-lg">
             {/* Agency Name & Logo Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
               <div className="space-y-sm">
@@ -59,6 +86,7 @@ export default function SignupDetailsPage() {
                 <input
                   type="text"
                   id="agency-name"
+                  name="agencyName"
                   value={agencyName}
                   onChange={(e) => setAgencyName(e.target.value)}
                   required
@@ -107,6 +135,7 @@ export default function SignupDetailsPage() {
                   <input
                     type="text"
                     id="contact-name"
+                    name="contactName"
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     required
@@ -124,10 +153,30 @@ export default function SignupDetailsPage() {
                   <input
                     type="email"
                     id="contact-email"
+                    name="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="sarah@skyline.com"
+                    className="w-full rounded bg-surface-container-lowest border border-border-gray px-md py-sm font-sm text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent transition-colors hover:bg-surface-gray"
+                  />
+                </div>
+                <div className="space-y-sm">
+                  <label
+                    className="block font-xs text-xs text-text-primary uppercase tracking-wider font-bold"
+                    htmlFor="contact-password"
+                  >
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    id="contact-password"
+                    name="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="At least 8 characters"
                     className="w-full rounded bg-surface-container-lowest border border-border-gray px-md py-sm font-sm text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary focus:border-transparent transition-colors hover:bg-surface-gray"
                   />
                 </div>
@@ -148,6 +197,11 @@ export default function SignupDetailsPage() {
                   />
                 </div>
               </div>
+              {actionState && "error" in actionState && (
+                <p className="font-sm text-sm text-error" role="alert">
+                  {actionState.error}
+                </p>
+              )}
             </div>
 
             {/* Address */}
@@ -234,9 +288,10 @@ export default function SignupDetailsPage() {
               </button>
               <button
                 type="submit"
-                className="bg-secondary text-on-secondary px-lg py-sm rounded font-sm text-sm font-semibold hover:bg-on-secondary-container transition-colors flex items-center gap-2"
+                disabled={pending}
+                className="bg-secondary text-on-secondary px-lg py-sm rounded font-sm text-sm font-semibold hover:bg-on-secondary-container transition-colors flex items-center gap-2 disabled:opacity-60"
               >
-                Continue to Step 2
+                {pending ? "Creating account…" : "Continue to Step 2"}
                 <span className="material-symbols-outlined text-[18px]">
                   arrow_forward
                 </span>
