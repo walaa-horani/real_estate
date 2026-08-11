@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getAgenciesList } from "@/lib/queries/agencies";
 import { signOut } from "@/lib/actions/auth";
+import FaqSection from "@/components/public/FaqSection";
 
 export default async function PublicLandingPage() {
   const supabase = await createServerSupabaseClient();
@@ -157,6 +158,8 @@ export default async function PublicLandingPage() {
           ))}
         </div>
       </section>
+
+      <FaqSection />
     </main>
   );
 }
