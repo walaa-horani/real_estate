@@ -1,0 +1,75 @@
+1. برومبت الإعداد الأساسي (Claude Code) — Supabase + معمارية المشروع
+
+I'm building an  MVP of a multi-tenant B2B SaaS real estate platform 
+ Please review this and ask clarifying questions before writing any code.
+
+## Tech Stack
+- Next.js (App Router)
+- Supabase (Postgres + Auth + Storage + Row Level Security)
+- PayTabs (payment gateway for tenant subscriptions)
+
+## Core Concept
+A platform where real estate offices/agencies are the paying tenants ("B2B"), 
+not individual home buyers. Each agency signs up, subscribes to a plan (via 
+PayTabs), then manages its own team and property listings.
+
+## Tenant Isolation Strategy
+Shared database, single schema, with a `tenant_id` column on every 
+tenant-scoped table (properties, leads, users/profiles, etc.). Enforce 
+isolation using native Postgres Row Level Security policies in Supabase — 
+not application-level filtering.
+
+## Two Distinct Data Access Contexts
+1. Public routes (no auth): landing page (agency directory), 
+   /agency/[slug] storefront, property detail pages — using a public/anon 
+   Supabase client with RLS policies allowing public SELECT on published data.
+2. Private dashboard routes (authenticated): strict tenant isolation via 
+   RLS on all CRUD operations.
+
+## Initial Schema
+- tenants (id, name, slug, logo_url, subscription_status)
+- profiles (id references auth.users, tenant_id, role: admin | agent)
+- properties (id, tenant_id, title, price, type, location, description, is_published)
+- property_images (id, property_id, storage_path)
+- leads (id, tenant_id, property_id, name, phone, message)
+
+## Scope for this MVP
+Slug-based routes (no real subdomains). Focus: tenant signup + PayTabs 
+subscription flow, schema + RLS policies, public directory + storefront, 
+basic dashboard CRUD. Out of scope: cross-agency search, messaging, analytics.
+
+Please start by proposing the schema and RLS policies, and explain the 
+reasoning behind each policy before generating extensive code.
+
+
+برومبت أمان الدفع 2 (PayTabs Webhook)
+
+Implement the PayTabs subscription webhook handler for a Next.js + Supabase 
+B2B SaaS. Security is critical here. Implement these safeguards, in this order:
+
+1. Signature verification: Compute HMAC-SHA256 of the raw request body 
+   using the PayTabs Server Key. Compare against the `Signature` header 
+   using constant-time comparison. Reject with 401 if mismatched.
+2. Server-to-server re-verification: call PayTabs' transaction query API 
+   using tran_ref to confirm status independently.
+3. Idempotency: check if tran_ref was already processed before activating anything.
+4. Amount/currency/reference validation: confirm cart_amount, cart_currency, 
+   and cart_id match the expected tenant + plan.
+5. Never activate a subscription from the return/redirect URL — only the 
+   verified webhook may set subscription_status = 'active'.
+6. Return 200 quickly; log every request (valid or rejected) for audit.
+
+Explain each safeguard briefly in comments as you implement it.
+
+
+3. برومبت التجديد اليدوي للاشتراك
+Add a manual renewal flow for existing tenants, reusing the same payment 
+verification logic already built (signature check, PayTabs re-verification, 
+idempotency, amount/currency validation) — don't duplicate it.
+1. Dashboard "Renew Subscription" action for tenant admins.
+2. Renewal payment request carries a distinguishing marker so the webhook 
+   knows to EXTEND the existing tenant rather than create a new one.
+3. On verified renewal: extend current_period_end by one billing period 
+   from its current value, and reset any "access blocked" status.
+
+
