@@ -73,3 +73,18 @@ idempotency, amount/currency validation) — don't duplicate it.
    from its current value, and reset any "access blocked" status.
 
 
+4. برومبت google stitch
+Design the UI for a multi-tenant B2B SaaS real estate platform. Real estate 
+agencies are the paying tenants; each agency manages its own team and 
+property listings. Design: 
+1. Public Landing Page (Agency Directory) 
+2. Agency Storefront Page (/agency/[slug]) 
+3. Property Detail Page (gallery, specs, lead/contact form) 
+4. Agency Signup + Subscription Flow (details → plan selection → payment confirmation) 
+5. Dashboard Login 
+6. Dashboard Property Management (list + add/edit form) 
+7. Dashboard Leads Page (inquiries table with status: New/Contacted/Closed) 
+8. Dashboard Team Page
+
+Design Style: clean, professional, trustworthy real estate feel. 
+Arabic-first layout (RTL support).
